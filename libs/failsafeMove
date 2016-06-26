@@ -1,0 +1,231 @@
+--[[
+Author: Sompom - Simon Redman
+Date: 16 March 2016
+Description: This is a collection of functions to aid turtle movement. In
+general, if movement is blocked, the turtle will attempt to dig in that
+direction until the movement succeeds or the stack overflows.
+]]--
+
+if (not os.loadAPI("/libs/turtleUtilities")) then
+  print("failsafeMove: Error loading turtleUtilities library")
+  error("Unable to load turtleUtilities library")
+end
+
+local x,y,z
+local orientation
+
+--If set to false, the turtle will try to move around obstacles rather than
+--going through them
+local digOnFail = true
+
+--[[ Called whenever the orientation changes with the first parameter being the
+new orientation. ]]--
+local orientationChangeCallback = nil
+local positionChangeCallback = nil
+local getPosition = function() return turtleUtilities.getGPSlock(false) end
+
+--[[ Change settings. Return the current settings ]]--
+function changeSettings(list)
+  if list.digOnFail then
+    digOnFail = list.digOnFail
+  end
+  if list.orientationChangeCallback then
+    orientationChangeCallback = list.orientationChangeCallback
+  end
+  if list.getPosition then
+    getPosition = list.getPosition
+  end
+  if list.getOrientation then
+    getOrientation = list.getOrientation
+  end
+  if list.positionChangeCallback then
+    positionChangeCallback = list.positionChangeCallback
+  end
+  
+  return {
+    digOnFail=digOnFail,
+    orientationChangeCallback=orientationChangeCallback,
+    getPosition=getPosition,
+    getOrientation=getOrientation,
+    positionChangeCallback=positionChangeCallback
+  }
+end
+
+--[[orientation will be:
+-y = 0 (South)
+-x = 1 (West)
++y = 2 (North)
++x = 3 (East)
+This matches exactly with orientation in game, except that Minecraft uses 0 for +y instead of 4.
+http://www.computercraft.info/forums2/index.php?/topic/1704-get-the-direction-the-turtle-face/
+--]]
+function getOrientation()
+  loc1 = vector.new(getPosition())
+  success = moveForward()
+  if not success then
+    for j=1,4 do
+      success = moveForward()
+      if not success then
+        turtle.faceDirection(orientation + 1 % 4)
+      else break end
+    end
+  end
+  if not success then
+    sendError("failsafeMove.getOrientation: Unable to get orientation")
+    error("Unable to get orientation")
+  end
+  loc2 = vector.new(getGPSlock(false))
+  heading = loc2 - loc1
+  return ((heading.x + math.abs(heading.x) * 2) + (heading.y + math.abs(heading.y) * 1))
+end
+
+--[[
+Turn towards the direction specified
+ints 0 thru 3 same as getOrientation()
+If defined, the orientationChangeCallback is called with the first parameter
+containing the new orientation
+]]--
+function faceDirection(dir)
+  if not orientation then
+    orientation = getOrientation()
+    x, y, z = getPosition() -- This is necessary
+  end
+
+  dir = dir % 4
+
+  if (dir + 1) % 4 == orientation then
+    turtle.turnRight()
+    orientation = dir
+  end
+
+
+  while orientation ~= dir do
+    turtle.turnLeft()
+    orientation = orientation + 1
+    orientation = orientation % 4
+  end
+  if orientationChangeCallback then
+    orientationChangeCallback(orientation)
+  end
+  return orientation
+end
+
+--[[
+If placeTorches is true, the turtle will place a torch whenever
+it is at a coordinate divisible by 5 in both x and y
+(i.e., 0,0,Z, 10,5,Z, but not 5,3,Z or 14,10,Z)
+]]--
+function moveForward(placeTorches, callback)
+  turtleUtilities.refuel()
+  if not turtle.forward() then
+    if digOnFail then
+      turtle.dig()
+    else
+      os.sleep(1) -- There are better solutions, but none easier
+    end
+    moveForward()
+  end
+
+  if callback then
+    callback()
+  end
+
+  if orientation == 1 or orientation == 3 then
+    x = x + orientation - 2 --Trust me on this one
+  else
+    y = y + orientation - 1
+  end
+
+  positionChangeCallback(x, y, z)
+
+  --print("moveForward: Coordinates: ", x, ", ", y, ", ", z)
+  --print(turtleUtilities.getGPSlock(false))
+
+  if placeTorches and x % 6 == 0 and y % 6 == 0 then
+    if turtleUtilities.searchInventory("minecraft:torch") then
+      turtle.turnLeft()
+      turtle.turnLeft()
+      turtle.place()
+      turtle.turnLeft()
+      turtle.turnLeft()
+    else
+      error("Out of torches")
+    end
+  end
+  return true
+end
+
+--Move or dig down
+function moveDown()
+  turtleUtilities.refuel()
+  if not turtle.down() then
+    if digOnFail then
+      turtle.digDown()
+    else
+      os.sleep(1) -- There are better solutions, but none easier
+    end
+    moveDown()
+  end
+  z = z - 1
+  positionChangeCallback(x, y, z)
+  return true
+end
+
+--Move or dig up
+function moveUp()
+  turtleUtilities.refuel()
+  if not turtle.up() then
+    if digOnFail then
+      turtle.digUp()
+    else
+      os.sleep(1) -- There are better solutions, but none easier
+    end
+    moveUp()
+  end
+  z = z + 1
+  positionChangeCallback(x, y, z)
+  return true
+end
+
+--Move the bot to the specified square
+function move(goalX, goalY, goalZ, placeTorches)
+  x, y, z = getPosition()
+  
+  --print(x .. ", " .. goalX)
+  --print(y .. ", " .. goalY)
+  --print(z .. ", " .. goalZ)
+  
+  -- First sort out the X coordinate
+  while x ~= goalX do
+    if x < goalX then --Goal to the +x
+      faceDirection(3)
+    elseif x > goalX then
+      faceDirection(1)
+    end
+    --x, y, z = getGPSlock(false)
+    moveForward(placeTorches, callback)
+    --print("move: X Position is " .. x)
+    --print("move: Orientation is " .. orientation)
+  end
+  
+  --Next deal with Y coordinate
+  while y ~= goalY do
+    if y < goalY then --Goal to +y
+      faceDirection(2)
+    elseif y > goalY then
+      faceDirection(0)
+    end
+    moveForward(placeTorches, callback)
+    --print("move: Y Position is " .. y)
+    --print("move: Orientation is " .. orientation)
+  end
+
+  --Finally get to the right height
+  while z ~= goalZ do
+    if z < goalZ then
+      moveUp()
+    else
+      moveDown()
+    end
+  end
+end

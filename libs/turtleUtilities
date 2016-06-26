@@ -1,0 +1,78 @@
+--[[
+Author: Sompom - Simon Redman
+Date: 16 March 2016
+Description: This is a collection of functions generally useful to operating
+turtles
+]]--
+
+--Prints out an error. An error is defined as something which will cause the
+--current process to not be able to continue.
+--Currently just to the screen. In the future, this should send an error on the
+--rednet to be displayed in a unified place
+function sendError(message)
+  print(message)
+end
+
+--Prints a warning. A warning is defined as something bad but which will not
+--halt current operation
+--Currently just calls sendError. Should be upgraded in the future.
+function sendWarning(message)
+  sendError(message)
+end
+
+--Searches the inventory for the given
+--ID. First slot with the given item
+--instance will be selected
+--DOES NOT take into account wear
+--Returns true if the item was found,
+--false if not
+function searchInventory(searchID)
+  data = turtle.getItemDetail()
+  if data and data.name == searchID then
+    return true
+  end
+  for i=1,16 do
+    turtle.select(i)
+    data = turtle.getItemDetail()
+    if data and data.name == searchID then
+      return true
+    end
+  end
+  return false
+end
+
+--Attempt to get a GPS lock, equipping 
+--left slot from 1 if no wireless modem
+--is available. If debug is true, prints
+--debugging info
+function getGPSlock(debug)
+  x, y, z = gps.locate(5, debug)
+  if not x then --GPS error
+    --"ComputerCraft:CC-Peripheral" belongs to the WirelessModem, but
+    -- but presumably belongs to other things as well. Oh well.
+    searchInventory("ComputerCraft:CC-Peripheral")
+    turtle.equipLeft() --Try to equip whatever we've found
+    x, y, z = gps.locate(5, debug)
+    turtle.equipLeft() -- Reverse equipping
+    if not x then --Guess that didn't work
+      -- This prints debug information to the screen. Ideally, it should be
+      -- be changed to send the debug info with the error.
+      gps.locate(5, true)
+      sendError("Unable to get GPS lock")
+      return nil
+    else
+      return x, y, z
+    end
+  end
+end
+
+--Refuels the turtle from its
+--inventory if necessary
+--Currently only works on charcoal/coal
+function refuel()
+  if turtle.getFuelLevel() == 0 then
+    --Should use a list of valid fuel sources
+    searchInventory("minecraft:coal")
+    turtle.refuel()
+  end
+end

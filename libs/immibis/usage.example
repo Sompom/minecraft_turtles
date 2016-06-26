@@ -1,0 +1,18 @@
+-- Set up a complicated table
+local a = {b={c={d={test=1}}}}
+a.b.c.d.e = a
+a[a.b.c] = {[a]=a,test=2}
+
+print(a.b.c.d.test) -- prints 1
+print(a[a.b.c][a][a.b.c].test) -- prints 2
+
+-- Serialize it
+local s = serialize(a)
+print(s) -- prints gibberish
+
+-- s is a string here - you can send it over modems or whatever (might not work with bundled cable rednet as I'm not sure if that preserves bit 7)
+
+-- Deserialize it
+local a2 = deserialize(s)
+print(a2.b.c.d.test) -- should print 1
+print(a2[a2.b.c][a2][a2.b.c].test) -- should print 2

@@ -1,0 +1,25 @@
+--assuming the API is saved under a folder called "oreilly"
+os.loadAPI("/oreilly/persistent")
+
+-- you don't need to 'create' variables in advance - it's all automatic
+persistent.update("Namespace","Variable","Value")
+persistent.read("Namespace","Variable")
+
+-- complex tables 'just work' thanks to Immibis
+example={a=10,b=20,c="Hello world!",d={another="table"}}
+example.e=example
+persistent.update("testing","table",example)
+result.e.a
+-- prints 10
+result.e.a + result.b
+-- prints 30
+result.d.another
+-- prints "table"
+
+-- last, easy existence checking and removal
+persistent.exists("testing","table")
+-- prints "true"
+persistent.delete("testing","table")
+-- will remove the file, and therefore the variable
+
+
