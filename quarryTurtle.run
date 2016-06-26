@@ -1,0 +1,197 @@
+os.loadAPI("/libs/oreilly/persistent")
+os.loadAPI("/libs/turtleUtilities") -- My own utility library
+os.loadAPI("/libs/failsafeMove") -- My own movement library
+os.loadAPI("/libs/print_r")
+
+--[[
+File: quarryTurtle.run
+Author: Sompom - Simon Redman
+Date: 3 April 2016
+Description: This program will mine the area the turtle is placed in to
+bedrock. The turtle must be placed facing north. It will store everything a container which must be placed in front of
+it when first set up
+]]--
+
+--Use the variables to configure the program to match your setup
+local persistentNamespace = "quarry"
+
+local xDirDig = 5 -- the turtle will dig this far in the both the +/-x direcions
+local yDirDig = 5 -- the turtle will dig this far in the both the +/-y directions
+local ignoreDepth = 5 -- the turtle will move this far down without quarrying
+
+local startPosition = {x=0, y=0, z=0}
+local startOrientation = 3
+
+-- The current position and orientation -- these are set in "main()"
+local position = nil
+local orientation = nil
+
+-- These probably never change.
+local firstSlot = 1
+local lastSlot = 16
+local reservedSlots = {
+  withdraw1 = 15, -- compare
+  fuel = 16  -- refuel
+}
+
+--[[ These are compass directions. Change them to match the specifics of your
+setup. The turtle should start facing in the direction specified by
+startOrientation. These directions are the direction that the turtle is facing
+when facing the indexed orientation]]--
+local directions = {}
+directions[0] = "EAST" -- -y
+directions[1] = "SOUTH" -- -x
+directions[2] = "WEST" -- +y
+directions[3] = "NORTH" -- +x
+  
+--[[ Just prints relevent debug information to the screen. Gathered here so
+it can be easily disabled ]]--
+local function debugOutput(message)
+  --print(message)
+end
+
+--[[ My goodness, arent we inefficient? ]]--
+local function isSlotReserved(slot)
+  for resSlot in pairs(reservedSlots) do
+    if slot == reservedSlots[resSlot] then
+      return true
+    end
+  end
+  return false
+end
+
+--[[
+Maps orientation to directions for wrapped peripheral calls. I cant think of a
+way to do thisother than hard-coding. This is specific to how you set up your
+warehouse and wont change.
+Confusingly, this is the opposite of the way the turtle is facing.
+]]--
+local function getPeripheralDirection(orientation)
+  return directions[(orientation + 2) % 4]
+end
+
+--[[
+Returns the inventory slot we want to pull from. In the case of a chest with
+a normal inventory, this just returns the input. In the case of drawers, 8 is
+the last slot and 5 is the first of a 2x2 drawer when withdrawing, while 2 is
+the slot on a 1x1 drawer. When depositing, drawers behave normally. Modify this
+to fit your setup.
+]]--
+local function getInventoryID(bay, withdrawing)
+  if not withdrawing then
+    return bay
+  else
+    return bay + 4
+  end
+end
+
+--[[
+Returns this turtles current location with 0,0,0 defined as where the turtle
+was initially placed
+]]--
+local function getTurtlePosition()
+  return position.x, position.y, position.z
+end
+
+-- Saves the changed orientation
+local function orientationChangeCallback(newOrientation)
+  orientation = newOrientation
+end
+
+local function positionChangeCallback(x, y, z)
+  --[[debugOutput("positionChangeCallback: Old position: " .. position.x .. ", " ..
+    position.y .. ", " .. position.z)
+  debugOutput("positionChangeCallback: New position: " .. x .. ", " .. y ..
+    ", " .. z)]]--
+  position.x = x
+  position.y = y
+  position.z = z
+
+  local personalData = persistent.read(persistentNamespace, os.getComputerLabel())
+  personalData.position = position
+  persistent.update(persistentNamespace, os.getComputerLabel(), personalData)
+end
+
+local function orientationChangeCallback(newOrientation)
+  orientation = newOrientation
+  local personalData = persistent.read(persistentNamespace, os.getComputerLabel())
+  personalData.orientation = newOrientation
+  persistent.update(persistentNamespace, os.getComputerLabel(), personalData)
+end
+
+--[[
+By default, the failsafeMove.move() function will try to move through the banks
+at some point. This function just breaks the given coordinates into
+one-dimensional moves to make sure we avoid doing anything silly.
+]]--
+local function outgoingMove(x, y, z)
+  failsafeMove.move(x, y, z)
+end
+
+--[[
+Returns to the (0,0,0) facing +x
+]]--
+local function returnToStart()
+  if (position.x ~= startPosition.x and position.y ~= startPosition.y) then
+    failsafeMove.move(position.x, startPosition.y, position.z)
+    failsafeMove.move(startPosition.x, position.y, position.z)
+  end
+  failsafeMove.move(position.x, position.y, startPosition.z)
+  failsafeMove.faceDirection(startOrientation)
+end
+
+--[[ Starting from the current slot, checks the next slots to see if they are
+free. Wraps if it doesnt find one until it gets back to where it started ]]--
+local function getFreeSlot()
+  local slot = nil
+  local offset = turtle.getSelectedSlot()
+  for i=firstSlot,lastSlot do
+    slot = (offset + i) % lastSlot
+    if turtle.getItemCount() == 0 then
+      break
+    end
+    repeat
+      if isSlotReserved(slot) then break end
+      turtle.select(slot)
+    until true
+  end
+  if (turtle.getItemCount() ~= 0) then
+    error("getFreeSlot: No free slots!")
+  end
+end
+
+--[[ Does all the setting up needed, then does good stuff ]]--
+local function main()
+  if not persistent.exists(persistentNamespace, os.getComputerLabel()) then
+    local personalData = {position=startPosition, orientation=startOrientation}
+    persistent.update(persistentNamespace, os.getComputerLabel(), personalData)
+  end
+  
+  local personalData = persistent.read(persistentNamespace, os.getComputerLabel())
+  position = personalData.position
+  orientation = personalData.orientation
+  
+  local list = {
+    digOnFail = true,
+    orientationChangeCallback = orientationChangeCallback,
+    getOrientation = function() return orientation end,
+    getPosition = getTurtlePosition,
+    positionChangeCallback = positionChangeCallback
+  }
+  failsafeMove.changeSettings(list)
+end
+
+--[[
+Does the actual quarrying work
+]]-- 
+local function quarry()
+--[[
+Current thought: Have slot 15 selected at all times while moving. Use
+the callback of failsafeMove.moveForward to compare whatever is in slot 15
+with everything else to combine stacks.
+]]--
+end
+
+main()
+returnToStart()
+quarry(0,0,-1)
