@@ -424,7 +424,7 @@ function withdraw(name, quantity)
   
   moveTo(location)
 
-  turtle.suck()
+  turtle.suck(quantity)
 
   local quantWithdrawn = turtle.getItemCount()
   
