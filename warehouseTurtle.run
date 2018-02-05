@@ -704,9 +704,3 @@ end
 main()
 returnToStart()
 UI()
---withdraw("minecraft:gunpowder", 9)
---withdraw("ImmersiveEngineering:bullet", 9)
---returnToStart()
---moveTo({bank=1, row=1, col=2, bay=4})
-deposit()
-
