@@ -484,8 +484,9 @@ function depositSingle(name)
   -- Re-deposit the thing we pulled out to compare to
   turtle.drop()
   turtle.select(currSlot)
-  if withdrawn ~= 0 then
+  if withdrawn then
     if not sameItem then
+      debugOutput("depositSingle: Tried to deposit, but found a not-same item. Recursing.")
       depositSingle(name .. "1")
       return
     end
@@ -496,6 +497,8 @@ function depositSingle(name)
   storeItemInfo(getHumanName(name), name, 64)
 
   turtle.drop(toDrop)
+  -- Default api has no way to report how much was actually deposited
+  local quantDeposited = toDrop
   if (quantDeposited ~= toDrop) then
     turtleUtilities.sendWarning("depositSingle: I tried to deposit " ..
     toDrop .. " of " .. name .. " but was only able to deposit " ..
