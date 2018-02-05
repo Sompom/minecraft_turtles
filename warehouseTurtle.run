@@ -53,13 +53,13 @@ and future withdrawals will come from the next location.
 --Use the variables to configure the program to match your setup
 local warehouseNamespace = "warehouseNamespace"
 
-local baysPerShelf = 4 -- Storage Drawers can store more than one stack
-local maxStacksPerBay = 8
+local baysPerShelf = 1 -- Storage Drawers can store more than one stack
+local maxStacksPerBay = 32
 
 local rowsPerColumn = 4
-local columnsPerRow = 5
+local columnsPerRow = 7
 -- The hallway is in the Nth column, with this value as N
-local columnsToHallway = 3
+local columnsToHallway = 6
 local numBanks = 2
 
 --[[
@@ -424,9 +424,9 @@ function withdraw(name, quantity)
   
   moveTo(location)
 
-  shelf = peripheral.wrap("front")
-  local quantWithdrawn = shelf.pushItemIntoSlot(getPeripheralDirection(orientation),
-    getInventoryID(location.bay, true), quantity, slot)
+  turtle.suck()
+
+  local quantWithdrawn = turtle.getItemCount()
   
   data.quantity = data.quantity - quantWithdrawn
   
@@ -476,12 +476,14 @@ function depositSingle(name)
   end
 
   --[[Test that this drawer actually contains what we want]]--
-  local shelf = peripheral.wrap("front")
-  local withdrawn = shelf.pushItemIntoSlot(getPeripheralDirection(orientation),
-    getInventoryID(location.bay, true), 1, 15)
-  local sameItem = turtle.compareTo(15)
-  shelf.pullItemIntoSlot(getPeripheralDirection(orientation),
-    15, 1, getInventoryID(location.bay, false))
+  local currSlot = turtle.getSelectedSlot()
+  -- Withdraw into the reserved slot to compare our held item to make sure it is the same
+  turtle.select(reservedSlots.withdraw1)
+  local withdrawn = turtle.suck()
+  local sameItem = turtle.compareTo(currSlot)
+  -- Re-deposit the thing we pulled out to compare to
+  turtle.drop()
+  turtle.select(currSlot)
   if withdrawn ~= 0 then
     if not sameItem then
       depositSingle(name .. "1")
@@ -490,12 +492,10 @@ function depositSingle(name)
   end
 
   --[[Do the deposit]]--
-  local shelf = peripheral.wrap("front")
   debugOutput("depositSingle: Depositing " .. toDrop .. " of " .. name)
   storeItemInfo(getHumanName(name), name, 64)
 
-  local quantDeposited = shelf.pullItemIntoSlot(getPeripheralDirection(orientation),
-    slot, toDrop, getInventoryID(location.bay, false))
+  turtle.drop(toDrop)
   if (quantDeposited ~= toDrop) then
     turtleUtilities.sendWarning("depositSingle: I tried to deposit " ..
     toDrop .. " of " .. name .. " but was only able to deposit " ..
