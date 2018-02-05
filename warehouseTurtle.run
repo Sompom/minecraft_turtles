@@ -91,12 +91,12 @@ directions[3] = "NORTH"
   
 --[[ Just prints relevent debug information to the screen. Gathered here so
 it can be easily disabled ]]--
-local function debugOutput(message)
+function debugOutput(message)
   --print(message)
 end
 
 --[[ My goodness, arent we inefficient? ]]--
-local function isSlotReserved(slot)
+function isSlotReserved(slot)
   for resSlot in pairs(reservedSlots) do
     if slot == reservedSlots[resSlot] then
       return true
@@ -111,7 +111,7 @@ way to do thisother than hard-coding. This is specific to how you set up your
 warehouse and wont change.
 Confusingly, this is the opposite of the way the turtle is facing.
 ]]--
-local function getPeripheralDirection(orientation)
+function getPeripheralDirection(orientation)
   return directions[orientation] 
 end
 
@@ -122,7 +122,7 @@ the last slot and 5 is the first of a 2x2 drawer when withdrawing, while 2 is
 the slot on a 1x1 drawer. When depositing, drawers behave normally. Modify this
 to fit your setup.
 ]]--
-local function getInventoryID(bay, withdrawing)
+function getInventoryID(bay, withdrawing)
   if not withdrawing then
     return bay
   else
@@ -131,7 +131,7 @@ local function getInventoryID(bay, withdrawing)
 end
 
 --[[ Returns the next empty bay]]--
-local function getNextBay()
+function getNextBay()
   if not persistent.exists(warehouseNamespace, "nextBay") then
     persistent.update(warehouseNamespace, "nextBay", {bank=1, row=1, col=1, bay=0})
   end
@@ -180,7 +180,7 @@ end
 --[[
 Returns the quantity, maxStack, and locations of an item
 ]]--
-local function getItemData(name)
+function getItemData(name)
   if (type(name) ~= "string") then
     error("Item names should be a string", 2)
   end
@@ -195,7 +195,7 @@ local function getItemData(name)
 end
 
 --[[ Stores a location as having been emptied ]]--
-local function storeEmptyLocation(location)
+function storeEmptyLocation(location)
   if not persistent.exists(warehouseNamespace, "emptiedBays") then
     persistent.update(warehouseNamespace, "emptiedBays", {})
   end
@@ -207,7 +207,7 @@ end
 --[[
 Opens and writes to the dictionary holding item information
 ]]--
-local function storeItemInfo(humanName, itemName, numberPerStack)
+function storeItemInfo(humanName, itemName, numberPerStack)
   if not persistent.exists(warehouseNamespace, "itemInfoDictionary") then
     local dictionary = {["humanToGame"] = {}, ["gameToHuman"] = {}}
     persistent.update(warehouseNamespace, "itemInfoDictionary", dictionary)
@@ -224,7 +224,7 @@ local function storeItemInfo(humanName, itemName, numberPerStack)
 end
 
 --[[Gets the human name associated with the item name in the "database"]]--
-local function getHumanName(itemName)
+function getHumanName(itemName)
   if not persistent.exists(warehouseNamespace, "itemInfoDictionary") then
     return "unknown"
   end
@@ -241,7 +241,7 @@ end
 Removes the named item from the database of known items. If there were other
 items with the same ID but with a larger postfix, move them up
 ]]--
-local function clearFromInfoDatabase(name)
+function clearFromInfoDatabase(name)
   local database = persistent.read(warehouseNamespace, "itemInfoDictionary")
   local humanName = database.gameToHuman[name]
   if (type(humanName) == "table") then humanName = table.remove(humanName) end
@@ -267,7 +267,7 @@ end
 Reads the item database and returns the game name associated with the human
 name. If the name is already a game name, return it directly
 ]]--
-local function convertHumanNameToGameName(name)
+function convertHumanNameToGameName(name)
   local database = persistent.read(warehouseNamespace, "itemInfoDictionary")
   if (database.humanToGame[name]) then
     return database.humanToGame[name]
@@ -282,7 +282,7 @@ end
 Returns the location of a stored item. Assigns a new spot if the item is not in
 the warehouse.
 ]]--
-local function getLocation(name)
+function getLocation(name)
   local locations = getItemData(name).locations
   toReturn = table.remove(locations)
   table.insert(locations, toReturn)
@@ -293,16 +293,16 @@ end
 Returns this turtles current location with 0,0,0 defined as standing in front
 of the first shelf
 ]]--
-local function getTurtlePosition()
+function getTurtlePosition()
   return position.x, position.y, position.z
 end
 
 -- Saves the changed orientation
-local function orientationChangeCallback(newOrientation)
+function orientationChangeCallback(newOrientation)
   orientation = newOrientation
 end
 
-local function positionChangeCallback(x, y, z)
+function positionChangeCallback(x, y, z)
   --[[debugOutput("positionChangeCallback: Old position: " .. position.x .. ", " ..
     position.y .. ", " .. position.z)
   debugOutput("positionChangeCallback: New position: " .. x .. ", " .. y ..
@@ -316,7 +316,7 @@ local function positionChangeCallback(x, y, z)
   persistent.update(warehouseNamespace, os.getComputerLabel(), personalData)
 end
 
-local function orientationChangeCallback(newOrientation)
+function orientationChangeCallback(newOrientation)
   orientation = newOrientation
   local personalData = persistent.read(warehouseNamespace, os.getComputerLabel())
   personalData.orientation = newOrientation
@@ -328,7 +328,7 @@ By default, the failsafeMove.move() function will try to move through the banks
 at some point. This function just breaks the given coordinates into
 one-dimensional moves to make sure we avoid doing anything silly.
 ]]--
-local function moveTo(location)
+function moveTo(location)
   bank = location.bank
   row = location.row
   col = location.col
@@ -357,7 +357,7 @@ end
 --[[
 Returns to the bottom of the hallway of the front bank facing +x
 ]]--
-local function returnToStart()
+function returnToStart()
   if (position.x ~= startPosition.x and position.y ~= startPosition.y) then
     failsafeMove.move(position.x, position.y, 2)
     failsafeMove.move(position.x, startPosition.y, position.z)
@@ -369,7 +369,7 @@ end
 
 --[[ Starting from the current slot, checks the next slots to see if they are
 free. Wraps if it doesnt find one until it gets back to where it started ]]--
-local function getFreeSlot()
+function getFreeSlot()
   local slot = nil
   local offset = turtle.getSelectedSlot()
   for i=firstSlot,lastSlot do
@@ -389,7 +389,7 @@ end
 
 --[[ Returns the number of items that should be in the most-recently-used bay
 according to the passed data table ]]--
-local function getQuantityInHighBay(data)
+function getQuantityInHighBay(data)
   return data.quantity % (data.maxStack * maxStacksPerBay)
 end
 
@@ -397,7 +397,7 @@ end
 If the item does not exist in the warehouse, throws an error. If there is not
 enough, simply withdraws the maximum possible. If the turtles inventory is 
 full, throws an error ]]--
-local function withdraw(name, quantity)
+function withdraw(name, quantity)
   if not persistent.exists(warehouseNamespace, name) then
     error("withdraw: " .. name .. " is not in the warehouse!")
   end
@@ -460,7 +460,7 @@ end
 Moves to an items location and deposits it. Stores in the next available
 slot if the item is not already in the warehouse
 ]]--
-local function depositSingle(name)
+function depositSingle(name)
   local slot = turtle.getSelectedSlot()
   local itemData = turtle.getItemDetail()
   local location = getLocation(name)
@@ -519,7 +519,7 @@ end
 --[[
 Deposits the turtles whole inventory, excluding reserved slots
 ]]--
-local function deposit()
+function deposit()
   for i=firstSlot,lastSlot do
     repeat
       if isSlotReserved(i) then break end
@@ -533,7 +533,7 @@ local function deposit()
 end
 
 --[[ Returns the quantity of the named item in the warehouse ]]--
-local function getQuantity(name)
+function getQuantity(name)
   validName, name = pcall(convertHumanNameToGameName, name)
   if (not validName) then return 0 end
   local itemData = getItemData(name)
@@ -546,7 +546,7 @@ Params should be a dictionary which could contain:
 a boolean, unknownOnly, which only prints items with no known name
 a string, searchStr, which will print only strings that contain that string
 ]]--
-local function getItems(params)  
+function getItems(params)  
   if not persistent.exists(warehouseNamespace, "itemInfoDictionary") then
     print("No items stored!")
     return
@@ -582,7 +582,7 @@ Params should be a dictionary which could contain:
 a boolean, unknownOnly, which only prints items with no known name
 a string, searchStr, which will print only strings that contain that string
 ]]--
-local function printItems(params)
+function printItems(params)
   local toPrint = getItems(params)
   for key, values in ipairs(toPrint) do
     if (values[1] == "unknown") then
@@ -597,7 +597,7 @@ end
 Presents items with no human redable name, one by one, for the user to give
 names to
 ]]--
-local function nameUnknownItems()
+function nameUnknownItems()
   local unknownItems = getItems({["unknownOnly"] = true})
   for key,values in ipairs(unknownItems) do
     local finished = false
@@ -631,7 +631,7 @@ local function nameUnknownItems()
 end
 
 --[[ Does all the setting up needed, then does good stuff ]]--
-local function main()
+function main()
   if not persistent.exists(warehouseNamespace, os.getComputerLabel()) then
     local personalData = {position=startPosition, orientation=startOrientation}
     persistent.update(warehouseNamespace, os.getComputerLabel(), personalData)
@@ -651,7 +651,7 @@ local function main()
   failsafeMove.changeSettings(list)
 end
 
-local function UI()
+function UI()
   while true do
     print()
     print("Please enter w for withdraw, d for deposit or help for more options")
